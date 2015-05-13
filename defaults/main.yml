@@ -1,0 +1,31 @@
+---
+
+# Install duplicity. Set to False to use installed one
+duplicity_backup_duplicity: True
+
+# Install duplicity from PPA, set to False install from distribution repository
+duplicity_backup_duplicity_repo: 'ppa:duplicity-team/ppa'
+
+duplicity_backup_logdir: '/var/log/duplicity-backup'
+duplicity_backup_log_file_owner: 'root'
+duplicity_backup_log_file_group: '{{ duplicity_backup_log_file_owner }}'
+
+duplicity_backup_config:
+  - name: 'default'
+    enabled: True
+    root: /
+    dest: 'scheme://[user@]host[:port]/[/]path ' # http://duplicity.nongnu.org/duplicity.1.html#sect7
+    ftp_password: 'XXX'
+    encryption: 'yes'
+    passphrase: 'XXXX'
+    static_options: [ '--full-if-older-than 28D', '--ssl-no-check-certificate' ]
+    clean_up_type: 'remove-all-but-n-full'
+    clean_up_variable: 4
+    inclist:
+      - '/home'
+      - '/var/lib/automysqlbackup/'
+    exclist:
+      - '/home/ansible' 
+    remove_logs_older_than: 30
+    time: 'daily'
+      

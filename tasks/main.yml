@@ -1,0 +1,71 @@
+---
+
+- name: Duplicity-backup | Add repository for duplicity
+  apt_repository: repo='{{ duplicity_backup_duplicity_repo }}'
+  when: (duplicity_backup_duplicity and duplicity_backup_duplicity_repo)
+
+- name: Duplicity-backup | Install duplicity
+  apt: pkg='{{ item }}' state=present
+  with_items:
+    - duplicity
+  when: duplicity_backup_duplicity
+
+- name: Duplicity-backup | Download duplicity-backup script from Github
+  get_url:
+    url: 'https://raw.githubusercontent.com/zertrin/duplicity-backup/master/duplicity-backup.sh'
+    dest: '/usr/local/bin/duplicity-backup.sh'
+    mode: '0700'
+
+- name: Duplicity-backup | Make sure configuration directory exists
+  file:
+    path: '/etc/duplicity-backup'
+    state: 'directory'
+    owner: 'root'
+    group: 'root'
+    mode: '0700'
+
+- name: Duplicity-backup | Create log directories
+  file:
+    path: '{{ item.logdir | default(duplicity_backup_logdir) }}'
+    state: 'directory'
+    owner: '{{ item.log_file_owner | default(duplicity_backup_log_file_owner) }}'
+    group: '{{ item.log_file_group | default(duplicity_backup_log_file_group) }}'
+    mode: '0750'
+  with_items: [ '{{ duplicity_backup_config }}' ]
+  when: ((duplicity_backup_config is defined and duplicity_backup_config) and
+         (item.name is defined and item.name) and
+         (item.delete is undefined or (item.delete is defined and not item.delete)))
+    
+
+- name: Duplicity-backup | Remove configuration files if requested
+  file:
+    dest: '/etc/duplicity-backup/{{ item.name }}.conf'
+    state: 'absent'
+  with_items: [ '{{ duplicity_backup_config }}' ]
+  when: ((duplicity_backup_config is defined and duplicity_backup_config) and
+         (item.name is defined and item.name) and
+         (item.delete is defined and item.delete))
+
+
+- name: Duplicity-backup | Setup duplicity-backup configurations
+  template:
+    src: 'duplicity-backup.conf.j2'
+    dest: '/etc/duplicity-backup/{{ item.name }}.conf'
+    owner: 'root'
+    group: 'root'
+    mode: '0600'
+  with_items: [ '{{ duplicity_backup_config }}' ]
+  when: ((duplicity_backup_config is defined and duplicity_backup_config) and
+         (item.name is defined and item.name) and
+         (item.delete is undefined or (item.delete is defined and not item.delete)))
+
+- name: Duplicity-backup | Schedule cron to runs backups
+  cron:
+    name: 'duplicity-backup_{{ item.name }}'
+    job: '/usr/local/bin/duplicity-backup.sh -c /etc/duplicity-backup/{{ item.name }}.conf -b'
+    special_time: '{{ item.time | default("daily") }}'
+    state: '{{ item.enabled | default(True) | ternary("present", "absent") }}'
+  with_items: [ '{{ duplicity_backup_config }}' ]
+  when: ((duplicity_backup_config is defined and duplicity_backup_config) and
+         (item.name is defined and item.name) and
+         (item.delete is undefined or (item.delete is defined and not item.delete)))
